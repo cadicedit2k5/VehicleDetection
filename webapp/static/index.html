@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YOLOv3 Vehicle Detection — BDD100K</title>
+  <meta name="description" content="Phát hiện phương tiện giao thông với YOLOv3 được train trên BDD100K + COCO. Hỗ trợ nhận dạng ô tô, xe buýt, xe tải, xe máy và xe đạp." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ═══ BACKGROUND PARTICLES ════════════════════════════════════ -->
+<div id="particles-container" aria-hidden="true"></div>
+
+<!-- ═══ HEADER ══════════════════════════════════════════════════ -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo-group">
+      <div class="logo-icon" aria-hidden="true">
+        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="12" width="36" height="20" rx="4" fill="url(#grad1)" opacity="0.9"/>
+          <circle cx="11" cy="32" r="4" fill="#00d2ff"/>
+          <circle cx="29" cy="32" r="4" fill="#00d2ff"/>
+          <rect x="8" y="6" width="24" height="10" rx="3" fill="url(#grad2)" opacity="0.7"/>
+          <path d="M16 19h8l2 4H14l2-4z" fill="white" opacity="0.6"/>
+          <defs>
+            <linearGradient id="grad1" x1="0" y1="0" x2="40" y2="0">
+              <stop offset="0%" stop-color="#7b2ff7"/>
+              <stop offset="100%" stop-color="#00d2ff"/>
+            </linearGradient>
+            <linearGradient id="grad2" x1="0" y1="0" x2="40" y2="0">
+              <stop offset="0%" stop-color="#00d2ff"/>
+              <stop offset="100%" stop-color="#7b2ff7"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <h1>VehicleDetect</h1>
+        <p class="logo-sub">BDD100K + COCO · 5 Classes</p>
+      </div>
+    </div>
+
+    <div class="header-badges">
+      <div class="badge" id="model-status-badge">
+        <span class="badge-dot" id="status-dot"></span>
+        <span id="status-text">Đang kết nối...</span>
+      </div>
+      <div class="badge badge-device" id="device-badge" style="display:none">
+        <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span id="device-label">CPU</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ MAIN ═════════════════════════════════════════════════════ -->
+<main class="main-grid">
+
+  <!-- ── COLUMN LEFT: Controls + Stats ──────────────────────────── -->
+  <aside class="sidebar">
+
+    <!-- Upload Zone -->
+    <section class="card upload-card" id="upload-section">
+      <h2 class="card-title">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v10M6 7l4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 15h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Tải ảnh lên
+      </h2>
+      <div
+        id="drop-zone"
+        class="drop-zone"
+        role="button"
+        tabindex="0"
+        aria-label="Kéo thả hoặc click để chọn ảnh"
+      >
+        <div class="drop-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none">
+            <rect x="8" y="8" width="48" height="48" rx="12" fill="url(#dz-grad)" opacity="0.15"/>
+            <path d="M32 20v16M24 28l8-8 8 8" stroke="url(#dz-grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M20 44h24" stroke="url(#dz-grad)" stroke-width="2.5" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="dz-grad" x1="0" y1="0" x2="64" y2="64">
+                <stop offset="0%" stop-color="#00d2ff"/>
+                <stop offset="100%" stop-color="#7b2ff7"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <p class="drop-text">Kéo & thả ảnh vào đây</p>
+        <p class="drop-sub">hoặc click để chọn file</p>
+        <div class="drop-paste-hint">
+          <kbd>Ctrl</kbd><span>+</span><kbd>V</kbd>
+          <span>để dán ảnh từ clipboard</span>
+        </div>
+        <span class="drop-fmt">JPG · PNG · BMP · WEBP</span>
+        <input type="file" id="file-input" accept="image/*" hidden />
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="card controls-card">
+      <h2 class="card-title">
+        <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M10 7v3l2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Tham số Inference
+      </h2>
+
+      <div class="control-group">
+        <label for="conf-slider">
+          Confidence Threshold
+          <span class="control-value" id="conf-value">0.80</span>
+        </label>
+        <div class="slider-track">
+          <input type="range" id="conf-slider" min="0.1" max="0.95" step="0.01" value="0.80" />
+          <div class="slider-fill" id="conf-fill"></div>
+        </div>
+        <div class="slider-labels"><span>0.1</span><span>0.95</span></div>
+      </div>
+
+      <div class="control-group">
+        <label for="iou-slider">
+          IoU Threshold (NMS)
+          <span class="control-value" id="iou-value">0.50</span>
+        </label>
+        <div class="slider-track">
+          <input type="range" id="iou-slider" min="0.1" max="0.9" step="0.01" value="0.50" />
+          <div class="slider-fill" id="iou-fill"></div>
+        </div>
+        <div class="slider-labels"><span>0.1</span><span>0.9</span></div>
+      </div>
+
+      <button class="btn-detect" id="detect-btn" disabled>
+        <span class="btn-icon">
+          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6" stroke="currentColor" stroke-width="1.8"/><path d="M10 7v3l2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </span>
+        <span id="btn-label">Chọn ảnh trước</span>
+        <span class="btn-pulse" id="btn-pulse" aria-hidden="true"></span>
+      </button>
+    </section>
+
+    <!-- Stats -->
+    <section class="card stats-card" id="stats-section" style="display:none">
+      <h2 class="card-title">
+        <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="12" width="3" height="5" rx="1" fill="currentColor"/><rect x="8.5" y="8" width="3" height="9" rx="1" fill="currentColor"/><rect x="14" y="4" width="3" height="13" rx="1" fill="currentColor"/></svg>
+        Kết quả phát hiện
+      </h2>
+
+      <div class="inference-time">
+        <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span id="inference-time-val">—</span> ms inference
+      </div>
+
+      <div class="total-count">
+        Tổng: <strong id="total-count">0</strong> phương tiện
+      </div>
+
+      <div class="class-stats" id="class-stats">
+        <!-- Được điền bởi JS -->
+      </div>
+    </section>
+
+    <!-- Model Info -->
+    <section class="card model-info-card" id="model-info-section">
+      <h2 class="card-title">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        Thông tin Model
+      </h2>
+      <dl class="info-list" id="model-info-list">
+        <div class="info-row"><dt>Kiến trúc</dt><dd>YOLOv3 + Darknet-53</dd></div>
+        <div class="info-row"><dt>Dataset</dt><dd>BDD100K + COCO</dd></div>
+        <div class="info-row"><dt>Input Size</dt><dd>416 × 416</dd></div>
+        <div class="info-row"><dt>Classes</dt><dd id="info-classes">5</dd></div>
+        <div class="info-row"><dt>Checkpoint</dt><dd id="info-checkpoint">—</dd></div>
+        <div class="info-row"><dt>Device</dt><dd id="info-device">—</dd></div>
+      </dl>
+    </section>
+
+  </aside>
+
+  <!-- ── COLUMN RIGHT: Canvas Result ────────────────────────────── -->
+  <section class="result-panel">
+
+    <!-- Empty state -->
+    <div class="empty-state" id="empty-state">
+      <div class="empty-illustration" aria-hidden="true">
+        <svg viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Road -->
+          <rect x="0" y="110" width="200" height="50" rx="0" fill="#1a2240"/>
+          <rect x="90" y="115" width="20" height="8" rx="2" fill="#2a3460"/>
+          <rect x="90" y="132" width="20" height="8" rx="2" fill="#2a3460"/>
+          <!-- Car 1 -->
+          <rect x="20" y="80" width="60" height="35" rx="6" fill="url(#car1-grad)"/>
+          <rect x="28" y="68" width="40" height="18" rx="4" fill="url(#car1-grad2)" opacity="0.8"/>
+          <circle cx="33" cy="115" r="8" fill="#1a2240"/><circle cx="33" cy="115" r="5" fill="#334"/>
+          <circle cx="67" cy="115" r="8" fill="#1a2240"/><circle cx="67" cy="115" r="5" fill="#334"/>
+          <!-- Car 2 -->
+          <rect x="120" y="80" width="65" height="35" rx="6" fill="url(#car2-grad)"/>
+          <rect x="130" y="68" width="42" height="18" rx="4" fill="url(#car2-grad2)" opacity="0.8"/>
+          <circle cx="133" cy="115" r="8" fill="#1a2240"/><circle cx="133" cy="115" r="5" fill="#334"/>
+          <circle cx="172" cy="115" r="8" fill="#1a2240"/><circle cx="172" cy="115" r="5" fill="#334"/>
+          <!-- Detection boxes (dashed) -->
+          <rect x="15" y="64" width="72" height="57" rx="3" stroke="#00d2ff" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.7"/>
+          <rect x="115" y="64" width="77" height="57" rx="3" stroke="#7b2ff7" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.7"/>
+          <!-- Labels -->
+          <rect x="15" y="52" width="34" height="14" rx="3" fill="#00d2ff"/>
+          <text x="19" y="63" font-family="monospace" font-size="8" fill="black">car</text>
+          <rect x="115" y="52" width="34" height="14" rx="3" fill="#7b2ff7"/>
+          <text x="119" y="63" font-family="monospace" font-size="8" fill="white">car</text>
+          <!-- Stars/particles -->
+          <circle cx="10" cy="20" r="1.5" fill="#00d2ff" opacity="0.6"/>
+          <circle cx="190" cy="30" r="1" fill="#7b2ff7" opacity="0.6"/>
+          <circle cx="100" cy="10" r="2" fill="#00d2ff" opacity="0.4"/>
+          <circle cx="170" cy="50" r="1.5" fill="#7b2ff7" opacity="0.5"/>
+          <defs>
+            <linearGradient id="car1-grad" x1="20" y1="80" x2="80" y2="115">
+              <stop offset="0%" stop-color="#1e3a8a"/><stop offset="100%" stop-color="#1e40af"/>
+            </linearGradient>
+            <linearGradient id="car1-grad2" x1="28" y1="68" x2="68" y2="86">
+              <stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1d4ed8"/>
+            </linearGradient>
+            <linearGradient id="car2-grad" x1="120" y1="80" x2="185" y2="115">
+              <stop offset="0%" stop-color="#7f1d1d"/><stop offset="100%" stop-color="#991b1b"/>
+            </linearGradient>
+            <linearGradient id="car2-grad2" x1="130" y1="68" x2="172" y2="86">
+              <stop offset="0%" stop-color="#dc2626"/><stop offset="100%" stop-color="#b91c1c"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <p class="empty-title">Chưa có ảnh để phân tích</p>
+      <p class="empty-sub">Tải một bức ảnh giao thông lên để YOLOv3 phát hiện phương tiện</p>
+      <div class="empty-tags">
+        <span class="cls-chip car">🚗 car</span>
+        <span class="cls-chip bus">🚌 bus</span>
+        <span class="cls-chip truck">🚛 truck</span>
+        <span class="cls-chip moto">🏍 motorcycle</span>
+        <span class="cls-chip bike">🚲 bicycle</span>
+      </div>
+    </div>
+
+    <!-- Result Canvas -->
+    <div class="canvas-wrapper" id="canvas-wrapper" style="display:none">
+      <div class="canvas-topbar">
+        <span class="canvas-label">Kết quả nhận dạng</span>
+        <div class="canvas-actions">
+          <button class="icon-btn" id="toggle-boxes-btn" title="Bật/tắt bounding boxes">
+            <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 3l14 14M17 3L3 17" stroke="currentColor" stroke-width="1.5" opacity="0.4"/></svg>
+          </button>
+          <button class="icon-btn" id="download-btn" title="Tải xuống ảnh kết quả">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v10M6 9l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 15h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="canvas-container">
+        <canvas id="result-canvas"></canvas>
+        <div class="detecting-overlay" id="detecting-overlay">
+          <div class="detecting-spinner"></div>
+          <p>Đang phân tích...</p>
+        </div>
+      </div>
+
+      <!-- Box Legend -->
+      <div class="box-legend" id="box-legend">
+        <!-- Được tạo bởi JS -->
+      </div>
+    </div>
+
+  </section>
+
+</main>
+
+<!-- ═══ FOOTER ═══════════════════════════════════════════════════ -->
+<footer class="footer">
+  <p>YOLOv3 · BDD100K + COCO · Darknet-53 Backbone · 5-Class Vehicle Detection</p>
+</footer>
+
+<!-- ═══ TOAST ════════════════════════════════════════════════════ -->
+<div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+<script src="js/main.js"></script>
+</body>
+</html>

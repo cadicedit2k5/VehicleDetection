@@ -1,0 +1,6 @@
+flask>=2.3
+torch>=1.13
+torchvision
+opencv-python-headless
+Pillow>=9.0
+numpy
